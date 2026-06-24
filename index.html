@@ -478,7 +478,38 @@
 
     const video = document.getElementById('video');
 
-    if (Hls.isSupported()) {
+    // Safari / iPhone — native HLS support (must check FIRST before HLS.js)
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url;
+
+      video.addEventListener('loadedmetadata', () => {
+        hidePlaceholder();
+        setLive(true);
+        setStatus('Live', url);
+        video.play().catch(() => {});
+      }, { once: true });
+
+      video.addEventListener('error', () => {
+        setLive(false);
+        setStatus('Could not load stream — check your URL', url);
+        showToast('Stream failed to load.');
+      }, { once: true });
+
+      // Poll to detect live status since Safari doesn't fire fragment events
+      const safariPoll = setInterval(() => {
+        if (!video.paused && video.readyState >= 3) {
+          setLive(true);
+          setStatus('Live', url);
+        }
+      }, 3000);
+
+      video.addEventListener('pause', () => {
+        clearInterval(safariPoll);
+        setLive(false);
+      });
+
+    } else if (Hls.isSupported()) {
+      // All other browsers — use HLS.js
       hls = new Hls({
         liveSyncDurationCount: 3,
         liveMaxLatencyDurationCount: 6,
@@ -520,21 +551,6 @@
           }
         }
       });
-
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Safari native HLS
-      video.src = url;
-      video.addEventListener('loadedmetadata', () => {
-        hidePlaceholder();
-        setLive(true);
-        setStatus('Live (native HLS)', url);
-        video.play().catch(() => {});
-      }, { once: true });
-      video.addEventListener('error', () => {
-        setLive(false);
-        setStatus('Could not load stream', url);
-        showToast('Stream failed to load.');
-      }, { once: true });
 
     } else {
       showToast('HLS is not supported in this browser.');
