@@ -418,17 +418,16 @@
             <input
               type="text"
               id="streamUrl"
-              placeholder="http://YOUR-IP:8080/hls/stream.m3u8"
+              placeholder="https://your-tunnel.trycloudflare.com/live/index.m3u8"
               spellcheck="false"
             />
             <button class="btn-load" onclick="loadStream()">Load</button>
           </div>
         </div>
         <div class="hint">
-          Point this at your NGINX-RTMP HLS output, e.g.
-          <code>http://192.168.1.x:8080/hls/live.m3u8</code><br/>
-          For public streams via ngrok:
-          <code>https://xxxx.ngrok.io/hls/live.m3u8</code>
+          Paste your Cloudflare Tunnel stream URL here, e.g.<br/>
+          <code>https://your-tunnel.trycloudflare.com/live/index.m3u8</code><br/>
+          Get this URL from your Cloudflare tunnel Command Prompt window.
         </div>
       </div>
     </div>
@@ -484,6 +483,12 @@
         liveSyncDurationCount: 3,
         liveMaxLatencyDurationCount: 6,
         maxBufferLength: 10,
+        enableWorker: true,
+        lowLatencyMode: true,
+        backBufferLength: 90,
+        xhrSetup: function(xhr) {
+          xhr.withCredentials = false;
+        },
       });
 
       hls.loadSource(url);
@@ -502,9 +507,17 @@
 
       hls.on(Hls.Events.ERROR, (event, data) => {
         if (data.fatal) {
-          setLive(false);
-          setStatus('Stream error — check your URL or server', url);
-          showToast('Fatal stream error: ' + data.type);
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            setStatus('Network error — retrying…', url);
+            hls.startLoad();
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            setStatus('Media error — recovering…', url);
+            hls.recoverMediaError();
+          } else {
+            setLive(false);
+            setStatus('Stream error — check your URL or server', url);
+            showToast('Fatal stream error: ' + data.type);
+          }
         }
       });
 
