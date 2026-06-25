@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LiveView — Self-Hosted Stream Player</title>
 
-  <!-- HLS.js for HLS stream playback -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js"></script>
-
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -22,6 +19,7 @@
       --cyan:      #00e5ff;
       --cyan-dim:  #007a8c;
       --red:       #ff3d5a;
+      --green:     #00e676;
       --text:      #e2eaf5;
       --muted:     #4a6080;
       --font-ui:   'Space Grotesk', sans-serif;
@@ -58,7 +56,6 @@
     }
     .wordmark span { color: var(--text); }
 
-    /* LIVE badge */
     .live-badge {
       display: flex;
       align-items: center;
@@ -88,7 +85,6 @@
       50%       { box-shadow: 0 0 0 6px rgba(255,61,90,0); }
     }
 
-    /* header right side */
     .header-right {
       display: flex;
       align-items: center;
@@ -139,7 +135,6 @@
       background: #000;
     }
 
-    /* Overlay when not playing */
     .placeholder {
       position: absolute;
       inset: 0;
@@ -172,7 +167,6 @@
       line-height: 1.6;
     }
 
-    /* scan-line ambient texture */
     .video-stage::after {
       content: '';
       position: absolute;
@@ -203,10 +197,7 @@
       flex-wrap: wrap;
     }
 
-    .status-bar .sep {
-      color: var(--border);
-      user-select: none;
-    }
+    .status-bar .sep { color: var(--border); user-select: none; }
 
     .status-bar .tag {
       font-family: var(--font-mono);
@@ -215,9 +206,8 @@
       border-radius: 3px;
       background: var(--border);
       letter-spacing: 0.06em;
+      color: var(--green);
     }
-    .tag.hls  { color: var(--cyan); }
-    .tag.rtmp { color: #ffa040; }
 
     /* ── URL DRAWER ───────────────────────────────────── */
     .url-drawer {
@@ -258,11 +248,9 @@
     .drawer-body {
       max-height: 0;
       overflow: hidden;
-      transition: max-height 0.35s ease, padding 0.35s ease;
+      transition: max-height 0.35s ease;
     }
-    .url-drawer.open .drawer-body {
-      max-height: 300px;
-    }
+    .url-drawer.open .drawer-body { max-height: 300px; }
 
     .drawer-inner {
       padding: 20px;
@@ -271,11 +259,7 @@
       gap: 14px;
     }
 
-    .input-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
+    .input-group { display: flex; flex-direction: column; gap: 6px; }
     .input-group label {
       font-size: 0.7rem;
       font-weight: 600;
@@ -284,10 +268,7 @@
       color: var(--muted);
     }
 
-    .input-row {
-      display: flex;
-      gap: 10px;
-    }
+    .input-row { display: flex; gap: 10px; }
 
     input[type="text"] {
       flex: 1;
@@ -334,7 +315,7 @@
       border-radius: 3px;
     }
 
-    /* ── ERROR TOAST ──────────────────────────────────── */
+    /* ── TOAST ──────────────────────────────────────── */
     .toast {
       position: fixed;
       bottom: 24px;
@@ -381,30 +362,24 @@
 </header>
 
 <main>
-
-  <!-- VIDEO PLAYER -->
   <div class="video-stage">
-    <video id="video" controls playsinline></video>
+    <video id="video" controls playsinline autoplay muted></video>
     <div class="placeholder" id="placeholder">
       <div class="placeholder-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24">
-          <path d="M8 5v14l11-7z"/>
-        </svg>
+        <svg width="24" height="24" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
       </div>
-      <p>Enter your HLS stream URL below to start watching.</p>
+      <p>Enter your WebRTC stream URL below to start watching.</p>
     </div>
   </div>
 
-  <!-- STATUS ROW -->
   <div class="status-bar" id="statusBar">
-    <span class="tag hls">HLS</span>
+    <span class="tag">WebRTC</span>
     <span class="sep">|</span>
     <span id="statusText">No stream loaded</span>
-    <span class="sep" id="urlDisplay" style="display:none">|</span>
-    <span id="urlDisplay2" style="font-size:0.7rem; word-break:break-all;"></span>
+    <span class="sep" id="urlSep" style="display:none">|</span>
+    <span id="urlDisplay" style="font-size:0.7rem; word-break:break-all;"></span>
   </div>
 
-  <!-- URL DRAWER -->
   <div class="url-drawer" id="urlDrawer">
     <div class="drawer-header" onclick="toggleDrawer()">
       <span class="drawer-title">Stream Source</span>
@@ -413,35 +388,37 @@
     <div class="drawer-body">
       <div class="drawer-inner">
         <div class="input-group">
-          <label>HLS Stream URL (.m3u8)</label>
+          <label>WebRTC Stream URL</label>
           <div class="input-row">
             <input
               type="text"
               id="streamUrl"
-              placeholder="https://your-tunnel.trycloudflare.com/live/index.m3u8"
+              placeholder="https://your-tunnel.trycloudflare.com/live/whep"
               spellcheck="false"
             />
             <button class="btn-load" onclick="loadStream()">Load</button>
           </div>
         </div>
         <div class="hint">
-          Paste your Cloudflare Tunnel stream URL here, e.g.<br/>
-          <code>https://your-tunnel.trycloudflare.com/live/index.m3u8</code><br/>
-          Get this URL from your Cloudflare tunnel Command Prompt window.
+          Paste your Cloudflare Tunnel WebRTC URL here:<br/>
+          <code>https://your-tunnel.trycloudflare.com/live/whep</code><br/>
+          Note: URL ends with <code>/live/whep</code> — not /index.m3u8
         </div>
       </div>
     </div>
   </div>
-
 </main>
 
-<!-- ERROR TOAST -->
 <div class="toast" id="toast"></div>
 
 <script>
-  let hls = null;
+  let pc = null;
+  let reconnectTimer = null;
+  let currentUrl = null;
+  let reconnectDelay = 2000;
+  let isConnected = false;
 
-  // ── Open drawer by default if no URL ──────────────
+  // ── Init ───────────────────────────────────────────
   window.addEventListener('DOMContentLoaded', () => {
     const saved = localStorage.getItem('liveview_url');
     if (saved) {
@@ -451,7 +428,6 @@
       openDrawer();
     }
 
-    // Load on Enter key
     document.getElementById('streamUrl').addEventListener('keydown', e => {
       if (e.key === 'Enter') loadStream();
     });
@@ -469,92 +445,117 @@
   function loadStream() {
     const input = document.getElementById('streamUrl').value.trim();
     if (!input) { showToast('Please enter a stream URL.'); return; }
+    currentUrl = input;
+    localStorage.setItem('liveview_url', input);
+    reconnectDelay = 2000;
+    startWebRTC(input);
+  }
 
-    const url = input;
-    localStorage.setItem('liveview_url', url);
+  // ── WebRTC / WHEP ──────────────────────────────────
+  async function startWebRTC(url) {
+    clearTimeout(reconnectTimer);
     setStatus('Connecting…', url);
+    setLive(false);
 
-    if (hls) { hls.destroy(); hls = null; }
+    // Clean up existing connection
+    if (pc) {
+      pc.close();
+      pc = null;
+    }
 
     const video = document.getElementById('video');
+    video.srcObject = null;
 
-    // Safari / iPhone — native HLS support (must check FIRST before HLS.js)
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = url;
+    try {
+      pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
 
-      video.addEventListener('loadedmetadata', () => {
-        hidePlaceholder();
-        setLive(true);
-        setStatus('Live', url);
-        video.play().catch(() => {});
-      }, { once: true });
+      // Add transceivers to receive audio and video
+      pc.addTransceiver('video', { direction: 'recvonly' });
+      pc.addTransceiver('audio', { direction: 'recvonly' });
 
-      video.addEventListener('error', () => {
-        setLive(false);
-        setStatus('Could not load stream — check your URL', url);
-        showToast('Stream failed to load.');
-      }, { once: true });
-
-      // Poll to detect live status since Safari doesn't fire fragment events
-      const safariPoll = setInterval(() => {
-        if (!video.paused && video.readyState >= 3) {
+      // When we get the remote stream, show it
+      pc.ontrack = (event) => {
+        if (event.streams && event.streams[0]) {
+          video.srcObject = event.streams[0];
+          hidePlaceholder();
           setLive(true);
           setStatus('Live', url);
+          reconnectDelay = 2000;
+          video.play().catch(() => {});
         }
-      }, 3000);
+      };
 
-      video.addEventListener('pause', () => {
-        clearInterval(safariPoll);
-        setLive(false);
-      });
-
-    } else if (Hls.isSupported()) {
-      // All other browsers — use HLS.js
-      hls = new Hls({
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 6,
-        maxBufferLength: 10,
-        enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 90,
-        xhrSetup: function(xhr) {
-          xhr.withCredentials = false;
-        },
-      });
-
-      hls.loadSource(url);
-      hls.attachMedia(video);
-
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        hidePlaceholder();
-        setStatus('Stream loaded — waiting for data…', url);
-        video.play().catch(() => {});
-      });
-
-      hls.on(Hls.Events.FRAG_LOADED, () => {
-        setLive(true);
-        setStatus('Live', url);
-      });
-
-      hls.on(Hls.Events.ERROR, (event, data) => {
-        if (data.fatal) {
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            setStatus('Network error — retrying…', url);
-            hls.startLoad();
-          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-            setStatus('Media error — recovering…', url);
-            hls.recoverMediaError();
-          } else {
-            setLive(false);
-            setStatus('Stream error — check your URL or server', url);
-            showToast('Fatal stream error: ' + data.type);
-          }
+      // Monitor connection state
+      pc.onconnectionstatechange = () => {
+        const state = pc.connectionState;
+        if (state === 'connected') {
+          setLive(true);
+          setStatus('Live', url);
+          isConnected = true;
+          reconnectDelay = 2000;
+        } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+          setLive(false);
+          isConnected = false;
+          scheduleReconnect(url);
         }
+      };
+
+      // Create SDP offer
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      // Wait for ICE gathering
+      await waitForICE(pc);
+
+      // Send offer to MediaMTX WHEP endpoint
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/sdp' },
+        body: pc.localDescription.sdp,
       });
 
-    } else {
-      showToast('HLS is not supported in this browser.');
+      if (!response.ok) {
+        throw new Error('WHEP server responded with ' + response.status);
+      }
+
+      const answerSDP = await response.text();
+      await pc.setRemoteDescription({ type: 'answer', sdp: answerSDP });
+
+      setStatus('Stream connected — waiting for video…', url);
+
+    } catch (err) {
+      setLive(false);
+      setStatus('Connection failed — retrying…', url);
+      scheduleReconnect(url);
     }
+  }
+
+  // Wait for ICE gathering to complete
+  function waitForICE(pc) {
+    return new Promise((resolve) => {
+      if (pc.iceGatheringState === 'complete') {
+        resolve();
+      } else {
+        pc.addEventListener('icegatheringstatechange', () => {
+          if (pc.iceGatheringState === 'complete') resolve();
+        });
+        // Timeout after 5 seconds regardless
+        setTimeout(resolve, 5000);
+      }
+    });
+  }
+
+  // ── Auto reconnect ─────────────────────────────────
+  function scheduleReconnect(url) {
+    clearTimeout(reconnectTimer);
+    const secs = Math.round(reconnectDelay / 1000);
+    setStatus('Reconnecting in ' + secs + 's…', url);
+    reconnectTimer = setTimeout(() => {
+      if (currentUrl) startWebRTC(currentUrl);
+    }, reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 1.5, 10000);
   }
 
   // ── UI helpers ─────────────────────────────────────
@@ -566,14 +567,14 @@
     const badge = document.getElementById('liveBadge');
     const label = document.getElementById('liveLabel');
     badge.classList.toggle('active', active);
-    label.textContent = active ? 'LIVE' : 'CONNECTING';
+    label.textContent = active ? 'LIVE' : (currentUrl ? 'CONNECTING' : 'OFFLINE');
   }
 
   function setStatus(msg, url) {
     document.getElementById('statusText').textContent = msg;
     if (url) {
-      document.getElementById('urlDisplay').style.display = '';
-      document.getElementById('urlDisplay2').textContent = url;
+      document.getElementById('urlSep').style.display = '';
+      document.getElementById('urlDisplay').textContent = url;
     }
   }
 
