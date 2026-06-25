@@ -5,347 +5,80 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LiveView — Self-Hosted Stream Player</title>
 
-  <!-- Google Fonts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg:        #080c14;
-      --surface:   #0e1520;
-      --border:    #1a2535;
-      --cyan:      #00e5ff;
-      --cyan-dim:  #007a8c;
-      --red:       #ff3d5a;
-      --green:     #00e676;
-      --text:      #e2eaf5;
-      --muted:     #4a6080;
-      --font-ui:   'Space Grotesk', sans-serif;
+      --bg: #080c14; --surface: #0e1520; --border: #1a2535;
+      --cyan: #00e5ff; --cyan-dim: #007a8c; --red: #ff3d5a;
+      --text: #e2eaf5; --muted: #4a6080;
+      --font-ui: 'Space Grotesk', sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
     }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-ui); overflow-x: hidden; }
 
-    html, body {
-      height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font-ui);
-      overflow-x: hidden;
-    }
-
-    /* ── TOP BAR ─────────────────────────────────────── */
     header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 24px;
-      border-bottom: 1px solid var(--border);
-      background: var(--surface);
-      position: sticky;
-      top: 0;
-      z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 24px; border-bottom: 1px solid var(--border);
+      background: var(--surface); position: sticky; top: 0; z-index: 100;
     }
-
-    .wordmark {
-      font-size: 1rem;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--cyan);
-    }
+    .wordmark { font-size: 1rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--cyan); }
     .wordmark span { color: var(--text); }
 
-    .live-badge {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.7rem;
-      font-weight: 600;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--muted);
-      transition: color 0.3s;
-    }
+    .live-badge { display: flex; align-items: center; gap: 8px; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); transition: color 0.3s; }
     .live-badge.active { color: var(--red); }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: background 0.3s; }
+    .live-badge.active .live-dot { background: var(--red); animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,61,90,0.6); } 50% { box-shadow: 0 0 0 6px rgba(255,61,90,0); } }
 
-    .live-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--muted);
-      transition: background 0.3s;
-    }
-    .live-badge.active .live-dot {
-      background: var(--red);
-      animation: pulse 1.6s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(255,61,90,0.6); }
-      50%       { box-shadow: 0 0 0 6px rgba(255,61,90,0); }
-    }
-
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-
-    .btn-settings {
-      background: none;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      padding: 6px 14px;
-      border-radius: 4px;
-      font-family: var(--font-ui);
-      font-size: 0.78rem;
-      font-weight: 500;
-      letter-spacing: 0.06em;
-      cursor: pointer;
-      transition: border-color 0.2s, color 0.2s;
-    }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .btn-settings { background: none; border: 1px solid var(--border); color: var(--muted); padding: 6px 14px; border-radius: 4px; font-family: var(--font-ui); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.06em; cursor: pointer; transition: border-color 0.2s, color 0.2s; }
     .btn-settings:hover { border-color: var(--cyan-dim); color: var(--cyan); }
 
-    /* ── MAIN LAYOUT ──────────────────────────────────── */
-    main {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 28px 20px 60px;
-      gap: 20px;
-      max-width: 1100px;
-      margin: 0 auto;
-    }
+    main { display: flex; flex-direction: column; align-items: center; padding: 28px 20px 60px; gap: 20px; max-width: 1100px; margin: 0 auto; }
 
-    /* ── VIDEO STAGE ──────────────────────────────────── */
-    .video-stage {
-      width: 100%;
-      background: #000;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      overflow: hidden;
-      position: relative;
-      aspect-ratio: 16/9;
-    }
+    .video-stage { width: 100%; background: #000; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; position: relative; aspect-ratio: 16/9; }
+    video { width: 100%; height: 100%; display: block; background: #000; }
 
-    video {
-      width: 100%;
-      height: 100%;
-      display: block;
-      background: #000;
-    }
-
-    .placeholder {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      background: #000;
-      transition: opacity 0.3s;
-    }
+    .placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #000; transition: opacity 0.3s; }
     .placeholder.hidden { opacity: 0; pointer-events: none; }
-
-    .placeholder-icon {
-      width: 56px; height: 56px;
-      border: 2px solid var(--border);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+    .placeholder-icon { width: 56px; height: 56px; border: 2px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
     .placeholder-icon svg { fill: var(--muted); }
+    .placeholder p { font-size: 0.82rem; color: var(--muted); letter-spacing: 0.05em; text-align: center; max-width: 260px; line-height: 1.6; }
+    .video-stage::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(to bottom, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px); pointer-events: none; }
 
-    .placeholder p {
-      font-size: 0.82rem;
-      color: var(--muted);
-      letter-spacing: 0.05em;
-      text-align: center;
-      max-width: 260px;
-      line-height: 1.6;
-    }
-
-    .video-stage::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: repeating-linear-gradient(
-        to bottom,
-        transparent,
-        transparent 2px,
-        rgba(0,0,0,0.04) 2px,
-        rgba(0,0,0,0.04) 4px
-      );
-      pointer-events: none;
-    }
-
-    /* ── STATUS BAR ───────────────────────────────────── */
-    .status-bar {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      font-size: 0.75rem;
-      font-family: var(--font-mono);
-      color: var(--muted);
-      flex-wrap: wrap;
-    }
-
+    .status-bar { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; font-size: 0.75rem; font-family: var(--font-mono); color: var(--muted); flex-wrap: wrap; }
     .status-bar .sep { color: var(--border); user-select: none; }
+    .status-bar .tag { font-family: var(--font-mono); font-size: 0.7rem; padding: 2px 7px; border-radius: 3px; background: var(--border); letter-spacing: 0.06em; color: var(--cyan); }
 
-    .status-bar .tag {
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      padding: 2px 7px;
-      border-radius: 3px;
-      background: var(--border);
-      letter-spacing: 0.06em;
-      color: var(--green);
-    }
-
-    /* ── URL DRAWER ───────────────────────────────────── */
-    .url-drawer {
-      width: 100%;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      overflow: hidden;
-    }
-
-    .drawer-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 20px;
-      cursor: pointer;
-      user-select: none;
-      border-bottom: 1px solid transparent;
-      transition: border-color 0.2s;
-    }
+    .url-drawer { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+    .drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; cursor: pointer; user-select: none; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
     .drawer-header:hover { border-bottom-color: var(--border); }
-
-    .drawer-title {
-      font-size: 0.8rem;
-      font-weight: 600;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-
-    .drawer-arrow {
-      transition: transform 0.3s;
-      color: var(--muted);
-      font-size: 0.9rem;
-    }
+    .drawer-title { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+    .drawer-arrow { transition: transform 0.3s; color: var(--muted); font-size: 0.9rem; }
     .url-drawer.open .drawer-arrow { transform: rotate(180deg); }
-
-    .drawer-body {
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.35s ease;
-    }
+    .drawer-body { max-height: 0; overflow: hidden; transition: max-height 0.35s ease; }
     .url-drawer.open .drawer-body { max-height: 300px; }
-
-    .drawer-inner {
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
+    .drawer-inner { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
     .input-group { display: flex; flex-direction: column; gap: 6px; }
-    .input-group label {
-      font-size: 0.7rem;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-
+    .input-group label { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
     .input-row { display: flex; gap: 10px; }
-
-    input[type="text"] {
-      flex: 1;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text);
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      padding: 10px 14px;
-      outline: none;
-      transition: border-color 0.2s;
-    }
+    input[type="text"] { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: var(--font-mono); font-size: 0.82rem; padding: 10px 14px; outline: none; transition: border-color 0.2s; }
     input[type="text"]:focus { border-color: var(--cyan-dim); }
     input[type="text"]::placeholder { color: var(--muted); }
-
-    .btn-load {
-      background: var(--cyan);
-      color: #000;
-      border: none;
-      border-radius: 4px;
-      font-family: var(--font-ui);
-      font-size: 0.78rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      padding: 10px 20px;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: opacity 0.2s;
-    }
+    .btn-load { background: var(--cyan); color: #000; border: none; border-radius: 4px; font-family: var(--font-ui); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 10px 20px; cursor: pointer; white-space: nowrap; transition: opacity 0.2s; }
     .btn-load:hover { opacity: 0.85; }
+    .hint { font-size: 0.72rem; color: var(--muted); line-height: 1.7; font-family: var(--font-mono); }
+    .hint code { color: var(--cyan); background: rgba(0,229,255,0.07); padding: 1px 5px; border-radius: 3px; }
 
-    .hint {
-      font-size: 0.72rem;
-      color: var(--muted);
-      line-height: 1.7;
-      font-family: var(--font-mono);
-    }
-    .hint code {
-      color: var(--cyan);
-      background: rgba(0,229,255,0.07);
-      padding: 1px 5px;
-      border-radius: 3px;
-    }
-
-    /* ── TOAST ──────────────────────────────────────── */
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      background: #1c0a0f;
-      border: 1px solid var(--red);
-      color: var(--red);
-      padding: 10px 20px;
-      border-radius: 4px;
-      font-size: 0.78rem;
-      font-family: var(--font-mono);
-      letter-spacing: 0.05em;
-      transition: transform 0.3s ease;
-      z-index: 999;
-      white-space: nowrap;
-    }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1c0a0f; border: 1px solid var(--red); color: var(--red); padding: 10px 20px; border-radius: 4px; font-size: 0.78rem; font-family: var(--font-mono); letter-spacing: 0.05em; transition: transform 0.3s ease; z-index: 999; white-space: nowrap; }
     .toast.show { transform: translateX(-50%) translateY(0); }
 
-    /* ── RESPONSIVE ───────────────────────────────────── */
-    @media (max-width: 600px) {
-      .input-row { flex-direction: column; }
-      .btn-load { width: 100%; }
-      header { padding: 12px 16px; }
-      main { padding: 16px 12px 40px; }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .live-dot { animation: none !important; }
-    }
+    @media (max-width: 600px) { .input-row { flex-direction: column; } .btn-load { width: 100%; } header { padding: 12px 16px; } main { padding: 16px 12px 40px; } }
+    @media (prefers-reduced-motion: reduce) { .live-dot { animation: none !important; } }
   </style>
 </head>
 <body>
@@ -363,17 +96,17 @@
 
 <main>
   <div class="video-stage">
-    <video id="video" controls playsinline autoplay muted></video>
+    <video id="video" controls playsinline></video>
     <div class="placeholder" id="placeholder">
       <div class="placeholder-icon">
         <svg width="24" height="24" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
       </div>
-      <p>Enter your WebRTC stream URL below to start watching.</p>
+      <p>Enter your stream URL below to start watching.</p>
     </div>
   </div>
 
-  <div class="status-bar" id="statusBar">
-    <span class="tag">WebRTC</span>
+  <div class="status-bar">
+    <span class="tag">HLS</span>
     <span class="sep">|</span>
     <span id="statusText">No stream loaded</span>
     <span class="sep" id="urlSep" style="display:none">|</span>
@@ -388,21 +121,15 @@
     <div class="drawer-body">
       <div class="drawer-inner">
         <div class="input-group">
-          <label>WebRTC Stream URL</label>
+          <label>HLS Stream URL (.m3u8)</label>
           <div class="input-row">
-            <input
-              type="text"
-              id="streamUrl"
-              placeholder="https://your-tunnel.trycloudflare.com/live/whep"
-              spellcheck="false"
-            />
+            <input type="text" id="streamUrl" placeholder="https://your-tunnel.trycloudflare.com/live/index.m3u8" spellcheck="false" />
             <button class="btn-load" onclick="loadStream()">Load</button>
           </div>
         </div>
         <div class="hint">
-          Paste your Cloudflare Tunnel WebRTC URL here:<br/>
-          <code>https://your-tunnel.trycloudflare.com/live/whep</code><br/>
-          Note: URL ends with <code>/live/whep</code> — not /index.m3u8
+          Paste your Cloudflare Tunnel stream URL here:<br/>
+          <code>https://your-tunnel.trycloudflare.com/live/index.m3u8</code>
         </div>
       </div>
     </div>
@@ -412,11 +139,10 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  let pc = null;
-  let reconnectTimer = null;
+  let hls = null;
   let currentUrl = null;
+  let reconnectTimer = null;
   let reconnectDelay = 2000;
-  let isConnected = false;
 
   // ── Init ───────────────────────────────────────────
   window.addEventListener('DOMContentLoaded', () => {
@@ -427,147 +153,175 @@
     } else {
       openDrawer();
     }
-
     document.getElementById('streamUrl').addEventListener('keydown', e => {
       if (e.key === 'Enter') loadStream();
     });
   });
 
   // ── Drawer ─────────────────────────────────────────
-  function toggleDrawer() {
-    document.getElementById('urlDrawer').classList.toggle('open');
-  }
-  function openDrawer() {
-    document.getElementById('urlDrawer').classList.add('open');
-  }
+  function toggleDrawer() { document.getElementById('urlDrawer').classList.toggle('open'); }
+  function openDrawer() { document.getElementById('urlDrawer').classList.add('open'); }
 
-  // ── Load stream ────────────────────────────────────
+  // ── Load stream entry point ────────────────────────
   function loadStream() {
     const input = document.getElementById('streamUrl').value.trim();
     if (!input) { showToast('Please enter a stream URL.'); return; }
     currentUrl = input;
     localStorage.setItem('liveview_url', input);
     reconnectDelay = 2000;
-    startWebRTC(input);
+    startStream(input);
   }
 
-  // ── WebRTC / WHEP ──────────────────────────────────
-  async function startWebRTC(url) {
+  // ── Core stream starter ────────────────────────────
+  function startStream(url) {
     clearTimeout(reconnectTimer);
     setStatus('Connecting…', url);
     setLive(false);
 
-    // Clean up existing connection
-    if (pc) {
-      pc.close();
-      pc = null;
-    }
+    if (hls) { hls.destroy(); hls = null; }
 
     const video = document.getElementById('video');
-    video.srcObject = null;
+    video.src = '';
 
-    try {
-      pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-      });
+    // ── Safari / iPhone native HLS ──────────────────
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url;
 
-      // Add transceivers to receive audio and video
-      pc.addTransceiver('video', { direction: 'recvonly' });
-      pc.addTransceiver('audio', { direction: 'recvonly' });
-
-      // When we get the remote stream, show it
-      pc.ontrack = (event) => {
-        if (event.streams && event.streams[0]) {
-          video.srcObject = event.streams[0];
-          hidePlaceholder();
-          setLive(true);
-          setStatus('Live', url);
-          reconnectDelay = 2000;
-          video.play().catch(() => {});
-        }
+      const onMeta = () => {
+        hidePlaceholder();
+        setLive(true);
+        setStatus('Live', url);
+        reconnectDelay = 2000;
+        video.play().catch(() => {});
+      };
+      const onErr = () => {
+        setLive(false);
+        scheduleReconnect(url);
+      };
+      const onStall = () => {
+        setLive(false);
+        scheduleReconnect(url);
       };
 
-      // Monitor connection state
-      pc.onconnectionstatechange = () => {
-        const state = pc.connectionState;
-        if (state === 'connected') {
+      video.addEventListener('loadedmetadata', onMeta, { once: true });
+      video.addEventListener('error', onErr, { once: true });
+      video.addEventListener('stalled', onStall, { once: true });
+
+      // Heartbeat — detect if Safari silently stops
+      const heartbeat = setInterval(() => {
+        if (video.readyState >= 3 && !video.paused) {
           setLive(true);
           setStatus('Live', url);
-          isConnected = true;
           reconnectDelay = 2000;
-        } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
-          setLive(false);
-          isConnected = false;
+        } else if (video.readyState < 2 && currentUrl) {
+          clearInterval(heartbeat);
           scheduleReconnect(url);
         }
-      };
+      }, 4000);
 
-      // Create SDP offer
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      // Wait for ICE gathering
-      await waitForICE(pc);
-
-      // Send offer to MediaMTX WHEP endpoint
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/sdp' },
-        body: pc.localDescription.sdp,
+    // ── HLS.js for all other browsers ──────────────
+    } else if (Hls.isSupported()) {
+      hls = new Hls({
+        // Maximum buffer — holds as much video as possible in memory
+        liveSyncDurationCount: 10,
+        liveMaxLatencyDurationCount: 30,
+        maxBufferLength: 600,
+        maxMaxBufferLength: 600,
+        maxBufferSize: 1000 * 1000 * 1000,
+        maxBufferHole: 5,
+        // Stability over low latency
+        lowLatencyMode: false,
+        enableWorker: true,
+        // Infinite timeouts — never give up waiting
+        levelLoadingTimeout: 2147483647,
+        fragLoadingTimeout: 2147483647,
+        manifestLoadingTimeout: 2147483647,
+        // Infinite retries — never stop trying
+        manifestLoadingMaxRetry: 2147483647,
+        manifestLoadingRetryDelay: 2000,
+        manifestLoadingMaxRetryTimeout: 2147483647,
+        levelLoadingMaxRetry: 2147483647,
+        levelLoadingRetryDelay: 2000,
+        levelLoadingMaxRetryTimeout: 2147483647,
+        fragLoadingMaxRetry: 2147483647,
+        fragLoadingRetryDelay: 2000,
+        fragLoadingMaxRetryTimeout: 2147483647,
+        xhrSetup: xhr => {
+          xhr.withCredentials = false;
+          xhr.timeout = 0; // 0 = no timeout on XHR requests
+        },
       });
 
-      if (!response.ok) {
-        throw new Error('WHEP server responded with ' + response.status);
-      }
+      hls.loadSource(url);
+      hls.attachMedia(video);
 
-      const answerSDP = await response.text();
-      await pc.setRemoteDescription({ type: 'answer', sdp: answerSDP });
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        hidePlaceholder();
+        setStatus('Stream loaded…', url);
+        reconnectDelay = 2000;
+        video.play().catch(() => {});
+      });
 
-      setStatus('Stream connected — waiting for video…', url);
+      hls.on(Hls.Events.FRAG_LOADED, () => {
+        setLive(true);
+        setStatus('Live', url);
+        reconnectDelay = 2000;
+      });
 
-    } catch (err) {
-      setLive(false);
-      setStatus('Connection failed — retrying…', url);
-      scheduleReconnect(url);
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        if (data.fatal) {
+          setLive(false);
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            // Keep retrying internally forever — never destroy
+            setStatus('Reconnecting…', url);
+            hls.startLoad();
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            setStatus('Recovering…', url);
+            hls.recoverMediaError();
+          } else {
+            // Only fully restart on non-recoverable errors
+            hls.destroy();
+            hls = null;
+            scheduleReconnect(url);
+          }
+        }
+        // Non-fatal errors — HLS.js handles internally, do nothing
+      });
+
+      // Minimal heartbeat — only restart if completely dead for 30 seconds
+      let lastFrag = Date.now();
+      hls.on(Hls.Events.FRAG_LOADED, () => { lastFrag = Date.now(); });
+      setInterval(() => {
+        if (hls && (Date.now() - lastFrag) > 30000 && video.readyState < 2) {
+          setLive(false);
+          hls.destroy();
+          hls = null;
+          scheduleReconnect(url);
+        }
+      }, 30000);
+
+    } else {
+      showToast('HLS is not supported in this browser.');
     }
   }
 
-  // Wait for ICE gathering to complete
-  function waitForICE(pc) {
-    return new Promise((resolve) => {
-      if (pc.iceGatheringState === 'complete') {
-        resolve();
-      } else {
-        pc.addEventListener('icegatheringstatechange', () => {
-          if (pc.iceGatheringState === 'complete') resolve();
-        });
-        // Timeout after 5 seconds regardless
-        setTimeout(resolve, 5000);
-      }
-    });
-  }
-
-  // ── Auto reconnect ─────────────────────────────────
+  // ── Auto reconnect with backoff ────────────────────
   function scheduleReconnect(url) {
     clearTimeout(reconnectTimer);
     const secs = Math.round(reconnectDelay / 1000);
     setStatus('Reconnecting in ' + secs + 's…', url);
     reconnectTimer = setTimeout(() => {
-      if (currentUrl) startWebRTC(currentUrl);
+      if (currentUrl) startStream(currentUrl);
     }, reconnectDelay);
-    reconnectDelay = Math.min(reconnectDelay * 1.5, 10000);
+    reconnectDelay = Math.min(reconnectDelay * 1.5, 8000);
   }
 
   // ── UI helpers ─────────────────────────────────────
-  function hidePlaceholder() {
-    document.getElementById('placeholder').classList.add('hidden');
-  }
+  function hidePlaceholder() { document.getElementById('placeholder').classList.add('hidden'); }
 
   function setLive(active) {
-    const badge = document.getElementById('liveBadge');
-    const label = document.getElementById('liveLabel');
-    badge.classList.toggle('active', active);
-    label.textContent = active ? 'LIVE' : (currentUrl ? 'CONNECTING' : 'OFFLINE');
+    document.getElementById('liveBadge').classList.toggle('active', active);
+    document.getElementById('liveLabel').textContent = active ? 'LIVE' : (currentUrl ? 'CONNECTING' : 'OFFLINE');
   }
 
   function setStatus(msg, url) {
